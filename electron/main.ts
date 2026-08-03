@@ -128,6 +128,16 @@ interface TabDocumentState {
   currentFilePath: string | null
   fileContentHtml: string
   fileExtras: FileExtras
+  /**
+   * DocxAst cached sau khi parseDocx() — dùng bởi serializeToDocx() khi save.
+   * Không truyền qua IPC. Undefined nếu file chưa được parse (new/template).
+   */
+  originalAst?: import('../../extension/src/shared/types').DocxAst
+  /**
+   * Raw XML string của word/numbering.xml — inject lại khi save để preserve
+   * numId và tránh numbering counter reset.
+   */
+  rawNumberingXml?: string
 }
 
 interface Tab {
@@ -713,6 +723,9 @@ async function loadAndSendFileToTab(tabId: string, filePath: string): Promise<vo
       defaultFont: parsed.metadata?.defaultFont ?? undefined,
       defaultFontSize: parsed.metadata?.defaultFontSize ?? undefined,
     }
+    // Cache AST — passed to serializeToDocx() on save to preserve round-trip fidelity
+    tab.documentState.originalAst = parsed.ast
+    tab.documentState.rawNumberingXml = parsed.rawNumberingXml
 
     tab.view.webContents.send('host-message', {
       type: 'load',
@@ -757,6 +770,8 @@ async function saveTabFile(tabId: string): Promise<void> {
       pageSettings: fileExtras.pageSettings,
       defaultFont: fileExtras.defaultFont,
       defaultFontSize: fileExtras.defaultFontSize,
+      originalAst: tab.documentState.originalAst,
+      rawNumberingXml: tab.documentState.rawNumberingXml,
     })
     await fs.writeFile(tab.documentState.currentFilePath, buffer)
     tab.isDirty = false
@@ -786,6 +801,8 @@ async function saveTabFileAs(tabId: string): Promise<void> {
       pageSettings: fileExtras.pageSettings,
       defaultFont: fileExtras.defaultFont,
       defaultFontSize: fileExtras.defaultFontSize,
+      originalAst: tab.documentState.originalAst,
+      rawNumberingXml: tab.documentState.rawNumberingXml,
     })
     await fs.writeFile(result.filePath, buffer)
     tab.documentState.currentFilePath = result.filePath
