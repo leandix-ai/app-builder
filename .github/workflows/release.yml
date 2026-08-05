@@ -157,18 +157,51 @@ jobs:
     needs: [build-windows, build-mac, build-linux]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-          merge-multiple: true   # gộp thư mục con (windows/macos/linux) vào 1 tree
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger Atlas VPS sync
+      # electron-builder --publish always đẩy file lên GitHub Release (không phải Actions artifacts)
+      # nên phải dùng gh CLI để tải asset từ Release thay vì actions/download-artifact
+      - name: Download release assets via gh CLI
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          gh release download "${{ steps.version.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --dir artifacts/ \
+            --skip-existing
+
+      - name: Show downloaded files (debug)
+        run: find artifacts/ -type f | sort
+
+      - name: SCP artifacts to Atlas VPS
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.ATLAS_VPS_HOST }}
           username: ${{ secrets.ATLAS_VPS_USER }}
           key: ${{ secrets.ATLAS_VPS_SSH_KEY }}
+          source: "artifacts"
+          target: "/home/atlasagent/leandixagent/downloads/_incoming"
+
+      - name: Run sync script on Atlas VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.ATLAS_VPS_HOST }}
+          username: ${{ secrets.ATLAS_VPS_USER }}
+          key: ${{ secrets.ATLAS_VPS_SSH_KEY }}
+          command: "/home/atlasagent/leandixagent/downloads/sync-from-incoming.sh ${{ steps.version.outputs.version }}"
+
+      - name: Verify on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.ATLAS_VPS_HOST }}
+          username: ${{ secrets.ATLAS_VPS_USER }}
+          key: ${{ secrets.ATLAS_VPS_SSH_KEY }}
           command: |
-            cd /home/atlasagent/leandixagent/downloads
-            ./sync-from-tar.sh "$REMOTE_ARTIFACTS_TARBALL"
+            ls -la /home/atlasagent/leandixagent/downloads/{windows,macos,linux}/
+            echo "---"
+            readlink /home/atlasagent/leandixagent/downloads/windows/latest.exe
+            readlink /home/atlasagent/leandixagent/downloads/macos/latest.dmg
+            readlink /home/atlasagent/leandixagent/downloads/linux/latest.deb
