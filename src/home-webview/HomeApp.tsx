@@ -173,7 +173,7 @@ function AboutModal({ lang, onClose }: { lang: Lang; onClose: () => void }) {
           <img src={logoUrl} alt="Leandix Atlas" className="about-logo" />
           <div>
             <div className="about-app-name">Leandix Atlas</div>
-            <div className="about-version">v1.0.7</div>
+            <div className="about-version">v2.0.0</div>
           </div>
         </div>
 
