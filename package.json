@@ -3,7 +3,7 @@
   "displayName": "Leandix Atlas",
   "description": "A block-based rich text editor for .docx files, powered by Tiptap",
   "publisher": "leandix",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "license": "MIT",
   "main": "./out/electron/main.js",
   "repository": {
