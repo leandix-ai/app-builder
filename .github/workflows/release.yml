@@ -150,3 +150,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npx electron-builder --linux --publish always
+  # ─────────────────────────────────────────
+  # Download to Server
+  # ─────────────────────────────────────────
+  download-artifacts:
+    needs: [build-windows, build-mac, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true   # gộp thư mục con (windows/macos/linux) vào 1 tree
+
+      - name: Trigger Atlas VPS sync
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.ATLAS_VPS_HOST }}
+          username: ${{ secrets.ATLAS_VPS_USER }}
+          key: ${{ secrets.ATLAS_VPS_SSH_KEY }}
+          command: |
+            cd /home/atlasagent/leandixagent/downloads
+            ./sync-from-tar.sh "$REMOTE_ARTIFACTS_TARBALL"
